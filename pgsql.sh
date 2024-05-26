@@ -6,6 +6,7 @@ set -euxo pipefail
 
 DIR=$(cd "$(dirname "$0")"; pwd -P)
 
+. "$DIR"/conf.version.sh
 
 ID=0
 NS="helm-$ID"
@@ -28,7 +29,7 @@ helm repo update
 
 helm install --version 11.9.1 --namespace "$NS" pgsql bitnami/postgresql --set primary.podLabels.tier="database",persistence.enabled="false"
 
-kubectl run -n "$NS" nginx --image=nginx -l "tier=webserver"
+kubectl run -n "$NS" nginx --image=nginx:$NGINX_VERSION -l "tier=webserver"
 kubectl wait --timeout=60s -n "$NS" --for=condition=Ready pods nginx
 kubectl exec -n "$NS" -it nginx -- \
     sh -c "apt-get update && apt-get install -y dnsutils inetutils-ping netcat net-tools procps tcpdump"
