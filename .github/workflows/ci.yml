@@ -1,5 +1,3 @@
-# Qserv operator CI workflow
----
 name: "CI"
 on:
   push:
@@ -8,8 +6,8 @@ on:
       - master
 jobs:
   main:
-    name: Run nginx-controller demo
-    runs-on: ubuntu-20.04
+    name: Run helm demo
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
