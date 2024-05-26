@@ -32,7 +32,7 @@ helm install --version 11.9.1 --namespace "$NS" pgsql bitnami/postgresql --set p
 kubectl run -n "$NS" nginx --image=nginx:$NGINX_VERSION -l "tier=webserver"
 kubectl wait --timeout=60s -n "$NS" --for=condition=Ready pods nginx
 kubectl exec -n "$NS" -it nginx -- \
-    sh -c "apt-get update && apt-get install -y dnsutils inetutils-ping netcat net-tools procps tcpdump"
+    sh -c "apt-get update && apt-get install -y dnsutils inetutils-ping netcat-traditional net-tools procps tcpdump"
 
 kubectl wait --timeout=120s -n "$NS" --for=condition=Ready pods -l app.kubernetes.io/instance=pgsql,tier=database
 
