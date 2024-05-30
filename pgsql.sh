@@ -24,10 +24,7 @@ kubectl label ns "$NS" "helm=$NS"
 # Disable data persistence
 helm delete pgsql --namespace "$NS" || echo "WARN pgsql release not found"
 
-helm repo add bitnami https://charts.bitnami.com/bitnami || echo "Failed to add bitnami repo"
-helm repo update
-
-helm install --version 11.9.1 --namespace "$NS" pgsql bitnami/postgresql --set primary.podLabels.tier="database",persistence.enabled="false"
+helm install --version 15.0.0 --namespace "$NS" pgsql oci://registry-1.docker.io/bitnamicharts/postgresql --set primary.podLabels.tier="database",persistence.enabled="false"
 
 kubectl run -n "$NS" nginx --image=nginx:$NGINX_VERSION -l "tier=webserver"
 kubectl wait --timeout=60s -n "$NS" --for=condition=Ready pods nginx
