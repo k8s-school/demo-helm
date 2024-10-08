@@ -33,6 +33,7 @@ kubectl exec -n "$NS" -it nginx -- \
 
 kubectl wait --timeout=120s -n "$NS" --for=condition=Ready pods -l app.kubernetes.io/instance=pgsql,tier=database
 
+sleep 5
 kubectl exec -n "$NS" nginx -- netcat -q 2 -zv pgsql-postgresql 5432
 
 # Interactive mode
