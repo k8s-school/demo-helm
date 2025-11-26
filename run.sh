@@ -303,6 +303,9 @@ demo_values_files() {
 
     execute_command "kubectl rollout status deployment/my-demo-app-prod" "Waiting for prod deployment"
 
+    echo "Waiting for production deployment to be fully ready..."
+    execute_command "kubectl wait --for=condition=available --timeout=300s deployment/my-demo-app-prod" "Ensuring prod deployment is available"
+
     execute_command "kubectl get pods,svc -l app.kubernetes.io/instance=my-demo-app-prod" "Checking prod deployment"
 }
 
@@ -348,7 +351,8 @@ test_environments() {
     execute_command "kubectl run test-dev --rm -i --restart=Never --image=curlimages/curl -- curl -s http://my-demo-app:8080/index.html | grep -E '<title>|<h1>'" "Testing dev environment content"
 
     echo "Testing production environment:"
-    execute_command "kubectl run test-prod --rm -i --restart=Never --image=curlimages/curl -- curl -s http://my-demo-app-prod/index.html | grep -E '<title>|<h1>'" "Testing prod environment content"
+    execute_command "kubectl get svc my-demo-app-prod" "Verifying production service exists"
+    execute_command "kubectl run test-prod --rm -i --restart=Never --image=curlimages/curl -- curl -s --max-time 30 http://my-demo-app-prod/index.html | grep -E '<title>|<h1>'" "Testing prod environment content"
 
     print_success "Both environments are responding correctly!"
 }
