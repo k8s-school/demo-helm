@@ -22,6 +22,6 @@ jobs:
           go install github.com/k8s-school/ktbx@v1.1.2-rc2
           ktbx create -s
           ktbx install helm
-      - name: Install postgresl with helm
+      - name: Install demo-app with helm
         run: |
           ./ci.sh

@@ -87,13 +87,145 @@ cleanup() {
     print_success "Cleanup completed"
 }
 
+# Function to create and configure the chart
+create_chart() {
+    print_step "Creating and Configuring Helm Chart"
+
+    # Remove existing chart if it exists
+    if [ -d "demo-app" ]; then
+        execute_command "rm -rf demo-app" "Removing existing demo-app directory"
+    fi
+
+    execute_command "helm create demo-app" "Creating new Helm chart"
+
+    print_success "Base chart created successfully!"
+}
+
+# Function to configure the chart
+configure_chart() {
+    print_step "Configuring Chart for nginx-unprivileged"
+
+    # Update values.yaml for nginx unprivileged
+    execute_command "sed -i 's|repository: nginx|repository: nginxinc/nginx-unprivileged|g' demo-app/values.yaml" "Updating image repository"
+    execute_command "sed -i 's|tag: \"\"|tag: \"1.28.0-alpine3.21-perl\"|g' demo-app/values.yaml" "Setting image tag"
+
+    # Add configmap configuration to values.yaml
+    cat >> demo-app/values.yaml << 'EOF'
+
+# ConfigMap configuration for nginx
+configmap:
+  enabled: true
+  data:
+    index.html: |
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>Welcome to Demo App</title>
+      </head>
+      <body>
+          <h1>Hello from Helm Chart Demo!</h1>
+          <p>This is a demo nginx application deployed with Helm.</p>
+      </body>
+      </html>
+EOF
+
+    print_success "Updated values.yaml with nginx unprivileged image and ConfigMap"
+
+    # Create ConfigMap template
+    cat > demo-app/templates/configmap.yaml << 'EOF'
+{{- if .Values.configmap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "demo-app.fullname" . }}-config
+  labels:
+    {{- include "demo-app.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.configmap.data }}
+  {{ $key }}: |
+{{ $value | indent 4 }}
+  {{- end }}
+{{- end }}
+EOF
+
+    print_success "Created ConfigMap template"
+
+    # Update deployment template for container port
+    execute_command "sed -i 's|containerPort: {{ .Values.service.port }}|containerPort: 8080|g' demo-app/templates/deployment.yaml" "Fixing container port to 8080"
+
+    # Add volume mount for ConfigMap to deployment
+    # This requires a more complex sed operation, so we'll use a temporary file
+    python3 << 'EOF'
+import re
+
+# Read the deployment file
+with open('demo-app/templates/deployment.yaml', 'r') as f:
+    content = f.read()
+
+# Add volume mount after resources section
+volume_mount = '''          volumeMounts:
+            {{- if .Values.configmap.enabled }}
+            - name: nginx-config
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            {{- end }}
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}'''
+
+# Replace existing volumeMounts section
+if 'volumeMounts:' in content:
+    content = re.sub(
+        r'          \{\{- with \.Values\.volumeMounts \}\}\n          volumeMounts:\n            \{\{- toYaml \. \| nindent 12 \}\}\n          \{\{- end \}\}',
+        volume_mount,
+        content
+    )
+else:
+    # Add after resources section
+    content = re.sub(
+        r'(          resources:\n            \{\{- toYaml \.Values\.resources \| nindent 12 \}\})',
+        r'\1\n' + volume_mount,
+        content
+    )
+
+# Add volumes section
+volume_section = '''      volumes:
+        {{- if .Values.configmap.enabled }}
+        - name: nginx-config
+          configMap:
+            name: {{ include "demo-app.fullname" . }}-config
+        {{- end }}
+        {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}'''
+
+# Replace existing volumes section
+content = re.sub(
+    r'      \{\{- with \.Values\.volumes \}\}\n      volumes:\n        \{\{- toYaml \. \| nindent 8 \}\}\n      \{\{- end \}\}',
+    volume_section,
+    content
+)
+
+# Write back the file
+with open('demo-app/templates/deployment.yaml', 'w') as f:
+    f.write(content)
+
+print("Updated deployment template with ConfigMap volume mount")
+EOF
+
+    print_success "Updated deployment template with ConfigMap volume mount and volume"
+
+    print_success "Chart configuration completed!"
+}
+
 # Function to demonstrate chart structure
 show_chart_structure() {
     print_step "Chart Structure Overview"
 
     echo "The demo-app chart structure:"
-    execute_command "find demo-app -type f | head -10" "Listing chart files"
+    execute_command "find demo-app -type f | head -15" "Listing chart files"
 
+    echo ""
     echo "Key modifications made:"
     echo "• Image: nginxinc/nginx-unprivileged:1.28.0-alpine3.21-perl"
     echo "• Container port: 8080 (nginx unprivileged default)"
@@ -311,6 +443,8 @@ main() {
 
     check_prerequisites
     cleanup
+    create_chart
+    configure_chart
     show_chart_structure
     validate_chart
     demo_basic_deployment
