@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(helm create:*)",
+      "Read(//home/fjammes/src/github.com/k8s-school/k8s-school-labs/content/1_Labs/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
