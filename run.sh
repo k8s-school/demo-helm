@@ -46,6 +46,21 @@ fi
 
 log_success "Prerequisites OK"
 
+# Setup: Install metrics-server (skip if already present)
+log_info "Setup: Checking metrics-server"
+if kubectl get deployment metrics-server -n kube-system &>/dev/null; then
+    log_success "metrics-server already installed, skipping"
+else
+    log_info "Installing metrics-server"
+    helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+    helm repo update
+    helm upgrade --install metrics-server metrics-server/metrics-server \
+        -n kube-system \
+        --set "args={--kubelet-insecure-tls}"
+    kubectl rollout status deployment/metrics-server -n kube-system --timeout=120s
+    log_success "metrics-server installed"
+fi
+
 # Create test directory
 TEST_DIR="helm-test-$(date +%s)"
 mkdir "$TEST_DIR" && cd "$TEST_DIR"
@@ -53,11 +68,16 @@ mkdir "$TEST_DIR" && cd "$TEST_DIR"
 # Step 1: Create chart
 log_info "Step 1: Creating Helm chart"
 helm create demo-app
+# Inspect a template to illustrate Helm's templating role
+cat demo-app/templates/service.yaml
 log_success "Chart created"
 
 # Step 2: Configure values
+# Use the non-root nginxinc/nginx-unprivileged image (listens on 8080, no root).
+# Create an override file instead of overwriting the generated values.yaml so the
+# demo survives Helm chart version bumps.
 log_info "Step 2: Configuring values"
-cat > demo-app/values.yaml << 'EOF'
+cat > demo-app/values-nginxinc.yaml << 'EOF'
 replicaCount: 1
 
 image:
@@ -121,7 +141,7 @@ log_success "Values configured"
 
 # Step 3: Deploy
 log_info "Step 3: Deploying application"
-helm install my-nginx ./demo-app
+helm install my-nginx ./demo-app -f demo-app/values-nginxinc.yaml
 
 # Wait a bit for deployment
 sleep 10
@@ -131,7 +151,7 @@ log_success "Application deployed"
 
 # Step 4: Test scaling
 log_info "Step 4: Testing scaling"
-helm upgrade my-nginx ./demo-app --set replicaCount=2
+helm upgrade my-nginx ./demo-app -f demo-app/values-nginxinc.yaml --set replicaCount=2
 sleep 5
 kubectl wait --for=condition=available deployment/my-nginx-demo-app --timeout=60s
 
